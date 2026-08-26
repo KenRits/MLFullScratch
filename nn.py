@@ -132,6 +132,8 @@ class NeuralNetwork(Model):
 
 class StandardMLP(NeuralNetwork):
     def __init__(self, unit_nums: list[int], task: str):
+
+        self.task = task
         
         layers = []
 
@@ -184,7 +186,7 @@ class StandardMLP(NeuralNetwork):
 
             # ア二メーション用の画像を作成.
             if painter is not None and step % 100 == 0:
-                painter.plot_prediction(model, X_train, y_train)
+                painter.plot_prediction(self, X_train, y_train)
 
         if painter is not None:
             painter.animate()
@@ -195,7 +197,18 @@ class StandardMLP(NeuralNetwork):
         X = self._to_2d(X)
         X_var = Variable(X.T)
         out = self.forward(X_var)
-        return out.data.T
+
+        if self.task == "r":
+            prediction = out.data.T
+
+        elif self.task == "c":
+            prediction = self._to_2d(np.argmax(out.data.T, axis=1))
+        
+        else:
+            raise ValueError(f"引数taskには'r'(回帰)もしくは'c'(多クラス分類)が想定されています. self.task: {self.task}")
+
+        return prediction
+
 
 
 
@@ -222,7 +235,7 @@ if __name__ == "__main__":
     loss_record = model.fit(X_train, y_train, batch_size=batch_size, alpha=0.01, max_iter=1000, painter=ClassificationPainter())
 
     # 図示
-    # loss
+    # lossT
     plt.plot(np.log10(loss_record))
     plt.grid()
     plt.show()
