@@ -14,6 +14,9 @@ NeuralNetworkクラスは自由度が高く汎用的なモデルを構築でき�
 ```python
 from nn import StandardMLP
 
+import numpy as np
+from matplotlib import pyplot as plt
+
 model = StandardMLP(unit_nums=[1, 16, 16, 1], task="r")
 ```
 引数unit_numsは, 各層のユニットの数を表しています. 
