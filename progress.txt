@@ -1,0 +1,37 @@
+8/20 目標: 回帰NNの完成. 
+そのために:
+1. Layerクラスの実装, 
+2. Adam(Optimizer)の実装
+3. NeuralNetwork(model)の実装.
+8/20
+1. 実装済み
+2. self.m, self.vの発散が確認された. ブロードキャスト機能が未実装であることに由来すると考えられる.
+3. 未テスト. BroadcastToを実装.
+積み残し: 
+1. numpyのBroadcastが行われるときに, 自動でBroadcastToを通すように修正する
+2. 分類NNを見据えて, Softmax(Layer)の実装のために, Sum(Function)とDiv(Function)を実装する.
+
+8/21 目標: BroadcastTo関連の諸機能を実装する. 
+1. ブロードキャストが行われる場合に, 自動でBroadcastToを通すようにする.
+2. その際にbackwardが問題なく機能するようにし, それを確認する. 
+
+8/23
+やったこと:
+1. rmul, radd, rsubを実装した.
+2. 定数倍, 定数の足し算など, VariableとVariable以外の演算に対応した. 
+3. SGD(Optimizer)を実装した.
+4. Variable.cleargrad, Optimizer.cleargladを実装した. 
+5. heapqが最小ヒープとなっていたので, 最大ヒープに修正した. 4, 5よりNNが正しく学習できるようになった.
+
+8/24
+やったこと:
+1. CrossEntropyLoss(Function), MSELoss(Function)を作成.
+2. StandardMLP(NeuralNetwork)を作成し, 多層パーセプトロンを簡単に実現できるようにした.
+3. 回帰問題について, うまくフィットできる部分とそうでない部分の差が激しい. 
+一部ニューロンの学習が止まっていることに起因すると考え, SiLU(Function)を実装した. ただし大きな改善には至らず.
+
+8/25
+やったこと:
+1. animator.pyを作成し, 分類問題および回帰問題のアニメーションを描画できるようにした.
+2. StandardMLPの分類モードのデバッグ.
+3. 以上より, 多層パーセプトロンの基本的な機能はすべて実装された. 
