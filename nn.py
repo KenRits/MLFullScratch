@@ -131,7 +131,7 @@ class NeuralNetwork(Model):
         return params
 
 class StandardMLP(NeuralNetwork):
-    def __init__(self, unit_nums: list[int], task="r"):
+    def __init__(self, unit_nums: list[int], task: str):
         
         layers = []
 
