@@ -2,8 +2,8 @@ import numpy as np
 
 rng = np.random.default_rng(0)
 class Model:
-    def __init__(self):
-        pass
+    def __init__(self, animator=None):
+        self.animator = animator
 
     def predict(self):
         raise NotImplementedError("Model.predictは継承先でのみ使用できます.")

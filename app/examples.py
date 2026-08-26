@@ -2,14 +2,15 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from NeuralNetwork.nn import StandardMLP
-from DecisionTree.randomForest import RandomForestClassifer, DecisionTreeClassifer
+from DecisionTree.randomForest import DecisionTreeClassifer, RandomForestClassifer
+from NeuralNetwork.animator import RegressionAnimator, ClassificationAnimator
 
 if __name__ == "__main__":
 
     # --- ニューラルネットワーク(StandardMLP)のサンプルコード. ---
 
     # 回帰
-    model = StandardMLP(unit_nums=[1, 16, 16, 1], task="r")
+    model = StandardMLP(unit_nums=[1, 16, 16, 1], task="r", animator=RegressionAnimator())
 
     # 訓練データ作成
     rng = np.random.default_rng(0)
@@ -21,6 +22,8 @@ if __name__ == "__main__":
 
     # 学習
     model.fit(X, y_train)
+
+    model.animator.animate()
 
     # 予測
     prediction = model.predict(X)
@@ -44,7 +47,7 @@ if __name__ == "__main__":
     rng = np.random.default_rng(0)
 
     # モデル定義
-    model = StandardMLP(unit_nums=[2, 16, 16, 2], task="c")
+    model = StandardMLP(unit_nums=[2, 16, 16, 2], task="c", animator=ClassificationAnimator())
 
     # 訓練データ作成(2値分類)
     data_n = 1000 # データの数

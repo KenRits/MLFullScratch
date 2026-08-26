@@ -67,8 +67,8 @@ class ReLuLayer(FunctionLayer):
         super().__init__(f.ReLu())
 
 class NeuralNetwork(Model):
-    def __init__(self, layers):
-        super().__init__()
+    def __init__(self, layers, animator=None):
+        super().__init__(animator=animator)
         self.layers = layers
 
     def forward(self, inp: Variable):
@@ -85,7 +85,7 @@ class NeuralNetwork(Model):
         return params
 
 class StandardMLP(NeuralNetwork):
-    def __init__(self, unit_nums: list[int], task: str):
+    def __init__(self, unit_nums: list[int], task: str, animator=None):
 
         self.task = task
         
@@ -99,7 +99,7 @@ class StandardMLP(NeuralNetwork):
             act_func_layer = FunctionLayer(f.SiLU())
             layers.append(act_func_layer)
 
-        super().__init__(layers)
+        super().__init__(layers, animator=animator)
 
         # 出力層の活性化関数と損失関数を同時に.
         if task == "r": 
@@ -113,8 +113,8 @@ class StandardMLP(NeuralNetwork):
         else:
             raise ValueError("引数taskには'r'(回帰)もしくは'c'(多クラス分類)が想定されています.")
 
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray, batch_size: int =None, alpha: float=0.01, max_iter: int =1000, painter=None):
-        
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, batch_size: int =None, alpha: float=0.01, max_iter: int =1000):
+
         X_train = self._to_2d(X_train)
         y_train = self._to_2d(y_train)
 
@@ -123,6 +123,9 @@ class StandardMLP(NeuralNetwork):
 
         if batch_size is None:
             batch_size = min(10, len(X_train))
+
+        if self.animator is not None: 
+            iter_interval = self.animator.get_iter_interval()
 
         optimizer = opt.Adam(self.params)
 
@@ -143,11 +146,8 @@ class StandardMLP(NeuralNetwork):
             optimizer.step(alpha=alpha)
 
             # ア二メーション用の画像を作成.
-            if painter is not None and step % 100 == 0:
-                painter.plot_prediction(self, X_train, y_train)
-
-        if painter is not None:
-            painter.animate()
+            if self.animator is not None and step % iter_interval == 0:
+                self.animator.plot_prediction(self, X_train, y_train)
 
         return loss_record
 
@@ -166,10 +166,6 @@ class StandardMLP(NeuralNetwork):
             raise ValueError(f"引数taskには'r'(回帰)もしくは'c'(多クラス分類)が想定されています. self.task: {self.task}")
 
         return prediction
-
-
-
-
 
 
 if __name__ == "__main__":
