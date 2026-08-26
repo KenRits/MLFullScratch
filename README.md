@@ -134,6 +134,8 @@ np.countourを利用して等高線を図示します. モデルの学習がう�
 2026/8/26現在, 分類タスクのみに対応しています. 
 モデルの使い方はほぼ変わらず, 
 ```python
+from DecisionTree.randomForest import DecisionTreeClassifer, RandomForestClassifer
+
 model = DecisionTreeClassifer() # Cart
 model = RandomForestClassifer() # ランダムフォレスト
 
@@ -143,8 +145,8 @@ model.fit(X_train, y_train)
 # 予測
 prediction = model.predict(X_test)
 ```
-で使用できます. ただし, `y_train`はone-hotベクトルではなく, 単なるラベルの列ベクトルを使用します. 例として, 3つの訓練標本に対応するラベルがそれぞれ$`0`$,$`0`$, $`1`$,であれば, 
+で使用できます. ただし, `y_train`はone-hotベクトルではなく, 単なるラベルの列ベクトルを使用します. 例として, 3つの訓練標本に対応するラベルがそれぞれ$`0, 0, 1`$であれば, 
 ```python
-y_train = np.ndarray([[0], [0], [1]])
+y_train = np.array([[0], [0], [1]])
 ```
 となります. 
