@@ -1,6 +1,6 @@
 # Hello, MLFullScratch
 このリポジトリは, 機械学習のメジャーなモデルをフルスクラッチで(つまり機械学習系ライブラリを一切使わずに)作成するというプロジェクトのバックアップです. 
-2026/8/26: 多層パーセプトロン(回帰, 多クラス分類)を実装しました. 
+2026/8/26: 多層パーセプトロン(回帰, 多クラス分類)と, Cart(決定木)とランダムフォレストを実装しました. 
 
 ## 多層パーセプトロン
 多層パーセプトロン(以降MLP)の構築方法を記します. MLPの構築のためにはnn.py内の, NeuralNetworkクラスもしくはStandardMLPクラスを使用します. 
@@ -130,3 +130,23 @@ plt.show()
 ```
 np.countourを利用して等高線を図示します. モデルの学習がうまくいっている場合, 原点中心の半径$`3`$の円に近しい境界線が描かれます. 
 
+## Cart(決定木), ランダムフォレスト
+2026/8/26現在, 分類タスクのみに対応しています. 
+モデルの使い方はほぼ変わらず, 
+```python
+from DecisionTree.randomForest import DecisionTreeClassifer, RandomForestClassifer
+
+model = DecisionTreeClassifer() # Cart
+model = RandomForestClassifer() # ランダムフォレスト
+
+# 学習
+model.fit(X_train, y_train)
+
+# 予測
+prediction = model.predict(X_test)
+```
+で使用できます. ただし, `y_train`はone-hotベクトルではなく, 単なるラベルの列ベクトルを使用します. 例として, 3つの訓練標本に対応するラベルがそれぞれ$`0, 0, 1`$であれば, 
+```python
+y_train = np.array([[0], [0], [1]])
+```
+となります. 
