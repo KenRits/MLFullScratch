@@ -1,6 +1,5 @@
 import numpy as np
 
-rng = np.random.default_rng(0)
 class Model:
     def __init__(self, animator=None):
         self.animator = animator
@@ -11,7 +10,8 @@ class Model:
     def fit(self):
         raise NotImplementedError("Model.fitは継承先でのみ使用できます.")
 
-    def _sample(self, X_train: np.ndarray, y_train: np.ndarray, batch_size: int) -> tuple[np.ndarray]:
+    def _sample(self, X_train: np.ndarray, y_train: np.ndarray, batch_size: int, seed=0) -> tuple[np.ndarray]:
+        rng = self._get_rng(seed)
         indices = rng.choice(len(X_train), batch_size)
         X_batch = X_train[indices]
         y_batch = y_train[indices]
@@ -44,3 +44,6 @@ class Model:
         
         else:
             raise ValueError(f"モデルの入力は2次元以下のnp.ndarrayか, int, floatに限られます. type(X): {type(X)}")
+
+    def _get_rng(self, seed=0):
+        return np.random.default_rng(seed)
