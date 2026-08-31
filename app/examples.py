@@ -3,136 +3,153 @@ from matplotlib import pyplot as plt
 
 from NeuralNetwork.nn import StandardMLP
 from DecisionTree.randomForest import DecisionTreeClassifer, RandomForestClassifer
-from NeuralNetwork.animator import RegressionAnimator, ClassificationAnimator
+from SVM.svm import SVC
+from datasets.dataset import ToyDatasetGenerator
 
 if __name__ == "__main__":
 
     # --- ニューラルネットワーク(StandardMLP)のサンプルコード. ---
 
-    # 回帰
-    model = StandardMLP(unit_nums=[1, 16, 16, 1], task="r", animator=RegressionAnimator())
+    # X**2 + noise を訓練データとして生成する. 
+    tdg = ToyDatasetGenerator(seed=0)
+    dataset = tdg.get_square(n=100)
 
-    # 訓練データ作成
-    rng = np.random.default_rng(0)
-
-    # y = x**2 + noise というデータを100個, X \in [-5, 5]の範囲で作成
-    data_n = 100
-    X = np.linspace(-5, 5, data_n)
-    y_train = X**2 + rng.normal(0, 1, data_n)
-
-    # 学習
-    model.fit(X, y_train)
-
-    model.animator.animate()
-
-    # 予測
-    prediction = model.predict(X)
-
-    # 訓練データをプロット
-    plt.scatter(X, y_train, color="blue", label="Training data")
-
-    # モデルの予測をプロット
-    plt.plot(X, prediction, color="red", label="MLP's prediction")
-
-    # グラフを整形
-    plt.legend()
-    plt.grid()
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title("StandardMLP's regression")
+    # 訓練データを描画
+    dataset.plot()
     plt.show()
 
-    # --- 分類タスク ---
+    X_train = dataset.X
+    y_train = dataset.y
 
-    rng = np.random.default_rng(0)
-
-    # モデル定義
-    model = StandardMLP(unit_nums=[2, 16, 16, 2], task="c", animator=ClassificationAnimator())
-
-    # 訓練データ作成(2値分類)
-    data_n = 1000 # データの数
-    r = 3 # 原点からの距離が3未満と3以上の点でクラスを分ける
-    lim = (-5, 5) # データの範囲
-
-    X_train = (lim[1] - lim[0]) * (rng.random((data_n, 2)) - 0.5) # x_1, x_2 \in [-5, 5]
-    mask = np.sum(X_train ** 2, axis=1) < r**2
-    y_train = np.eye(2)[mask.astype(int)] # One-hotベクトル
-
-    # テストデータ作成 (データの範囲内に, 100 * 100の格子点を作成する.)
-    x1 = np.linspace(lim[0], lim[1], 100)
-    x2 = np.linspace(lim[0], lim[1], 100)
-    xx1, xx2 = np.meshgrid(x1, x2)
-    X_test = np.array([xx1.flatten(), xx2.flatten()]).T
+    # 回帰
+    model = StandardMLP(unit_nums=[1, 8, 1], task="r")
 
     # 学習
-    model.fit(X_train, y_train, batch_size=100, max_iter=5000)
+    loss_record = model.fit(X_train, y_train, alpha=0.2, max_iter=100, batch_size=100)
+
+    # 損失の変遷を描画
+    plt.plot(loss_record)
+    plt.grid()
+    plt.xlabel("step")
+    plt.ylabel("loss")
+    plt.show()
+
+    # 予測
+    X_test = np.linspace(-3, 3, num=100)
+    prediction = model.predict(X_test)
+
+    # もう一度訓練データを描画し, axesオブジェクトを取得. その上にモデルの予測を描画していく. 
+    ax = dataset.plot()
+
+    # モデルの予測をプロット
+    ax.plot(X_test, prediction, color="red", label="MLP's prediction")
+
+    # グラフを整形
+    ax.legend()
+    ax.grid(True)
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_title("StandardMLP's regression")
+    plt.show()
+
+    # --- ニューラルネットワーク(分類)のサンプルコード ---
+    
+    dataset = tdg.get_spiral(n=100, class_n=3)
+
+    dataset.plot()
+    plt.show()
+
+    X_train = dataset.X
+    y_train = dataset.y_onehot
+
+    model = StandardMLP([2, 8, dataset.class_n], task="c")
+
+    # 学習
+    loss_record = model.fit(X_train, y_train, batch_size=10, max_iter=1000)
+
+    # 損失の変遷を描画
+    plt.plot(np.log10(loss_record))
+    plt.grid()
+    plt.xlabel("step")
+    plt.ylabel("loss")
+    plt.show()
+
+    xx1, xx2 = dataset.meshgrid(n=100)
+    X_test = np.array([xx1.ravel(), xx2.ravel()]).T
 
     # 予測
     prediction = model.predict(X_test)
 
-    # 訓練データ図示
-    class1_X = X_train[mask]
-    class2_X = X_train[~mask]
-
-    plt.scatter(class1_X.T[0], class1_X.T[1], color="blue", label="class1")
-    plt.scatter(class2_X.T[0], class2_X.T[1], color="red", label="class2")
+    ax = dataset.plot()
 
     # 学習結果図示 (クラス境界の図示)
-    Z = np.reshape(prediction, (100, 100))
-    plt.contour(xx1, xx2, Z, colors="black", linewidths=3, levels=0)
-    plt.grid()
-    plt.legend()
-    plt.title("StandardMLP's decision boundary")
+    zz = np.reshape(prediction, (100, 100))
+    ax.contourf(xx1, xx2, zz, levels=dataset.class_n, alpha=0.5)
+    ax.grid(True)
+    ax.legend()
+    ax.set_title("StandardMLP's decision boundary")
     plt.show()
 
     # Cart(決定木)のサンプルコード
     # --- 分類 --- (訓練データXは上記コードと同じものを使用)
 
     # y_trainはOne-hotではなく, 普通のラべルを使用
-    y_train = mask.astype(int)
-
+    y_train = dataset.y
     model = DecisionTreeClassifer()
     
     # 学習
     model.fit(X_train, y_train)
+
+    # 予測
     prediction = model.predict(X_test)
 
-    # 訓練データ図示
-    class1_X = X_train[mask]
-    class2_X = X_train[~mask]
-
-    plt.scatter(class1_X.T[0], class1_X.T[1], color="blue", label="class1")
-    plt.scatter(class2_X.T[0], class2_X.T[1], color="red", label="class2")
+    ax = dataset.plot()
 
     # 学習結果図示 (クラス境界の図示)
-    Z = np.reshape(prediction, (100, 100))
-    plt.contour(xx1, xx2, Z, colors="black", linewidths=3, levels=0)
-    plt.grid()
-    plt.legend()
-    plt.title("DecisionTreeClassifer's decision boundary")
+    zz = np.reshape(prediction, (100, 100))
+    ax.contourf(xx1, xx2, zz, levels=dataset.class_n, alpha=0.5)
+    ax.grid(True)
+    ax.legend()
+    ax.set_title("DecisionTreeClassifer's decision boundary")
     plt.show()
 
 
     # ランダムフォレストのサンプルコード
 
-    # --- 分類 --- (訓練データXは上記コードと同じものを使用)
     model = RandomForestClassifer()
-
+    
     # 学習
     model.fit(X_train, y_train)
+
+    # 予測
     prediction = model.predict(X_test)
 
-    # 訓練データ図示
-    class1_X = X_train[mask]
-    class2_X = X_train[~mask]
-
-    plt.scatter(class1_X.T[0], class1_X.T[1], color="blue", label="class1")
-    plt.scatter(class2_X.T[0], class2_X.T[1], color="red", label="class2")
+    ax = dataset.plot()
 
     # 学習結果図示 (クラス境界の図示)
-    Z = np.reshape(prediction, (100, 100))
-    plt.contour(xx1, xx2, Z, colors="black", linewidths=3, levels=0)
-    plt.grid()
-    plt.legend()
-    plt.title("RandomForestClassifer's decision boundary")
+    zz = np.reshape(prediction, (100, 100))
+    ax.contourf(xx1, xx2, zz, levels=dataset.class_n, alpha=0.5)
+    ax.grid(True)
+    ax.legend()
+    ax.set_title("RandamForest's decision boundary")
+    plt.show()
+
+    # SVMのサンプルコード
+
+    model = SVC()
+    
+    # 学習
+    model.fit(X_train, y_train)
+
+    # 予測
+    prediction = model.predict(X_test)
+
+    ax = dataset.plot()
+
+    # 学習結果図示 (クラス境界の図示)
+    zz = np.reshape(prediction, (100, 100))
+    ax.contourf(xx1, xx2, zz, levels=dataset.class_n, alpha=0.5)
+    ax.grid(True)
+    ax.legend()
+    ax.set_title("SVC's decision boundary")
     plt.show()
