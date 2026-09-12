@@ -147,7 +147,7 @@ class SVMBinaryClassifer(Model):
         else:
             return np.sign(score)
 
-class SVC(SVMBinaryClassifer):
+class SVC(Model):
     def __init__(self):
         pass
 
