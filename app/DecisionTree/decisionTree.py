@@ -2,18 +2,18 @@ from model import Model
 import exception
 
 import numpy as np
-
 class Node:
-    def __init__(self, path, label, gini, sample_n):
-        self.path = path
+    def __init__(self, path: str, label: any, gini: float, sample_n: int):
+        self.path = path # ルートノードからのパス. ルートの左子の右子ならば, pathは"./l/r"(".", "l", "r")といった文字列は, DecisionTreeクラスで変更できる.
         self._is_leaf = False
-        self._left = None
-        self._right = None
-        self._label = label
-        self._gini = gini
-        self._sample_n = sample_n
-        self._parent = None
+        self._left = None # Nodeインスタンス. 左子.
+        self._right = None # 右子
+        self._label = label # 葉ノードの場合のみ. 葉ノードの表すラベル(このノードに割り当てられた訓練データのラベルの多い方.)
+        self._gini = gini # このノードに割り当てられた訓練データのジニ不純度.
+        self._sample_n = sample_n # このノードに割り当てられた訓練データの数.
+        self._parent = None # Nodeインスタンス. 親ノード.
 
+    # getter
     def get_label(self):
         return self._label
     
@@ -32,11 +32,12 @@ class Node:
     def get_parent(self):
         return self._parent
 
+    # setter
     def set_parent(self, parent):
         self._parent = parent
 
 class LeafNode(Node):
-    def __init__(self, path, label, gini, sample_n):
+    def __init__(self, path: str, label: any, gini: float, sample_n: int):
         super().__init__(path, label, gini, sample_n)
         self._is_leaf = True
 
@@ -52,14 +53,27 @@ class LeafNode(Node):
     def get_tree_dict(self):
         return {self.path: self}
     
-    def predict(self, x):
+    def predict(self, x: np.ndrray) -> any:
+        """特徴ベクトルxのラベルを予測する. 
+        
+        訓練時に登録されたラベルを返す.
+
+        Args:
+            x (np.ndarray): 特徴量. 1次元のnumpy配列.
+
+        Raises:
+            exception.InvalidNodeSettingException: ラベルが設定されていない場合に発火.
+
+        Returns:
+            any: 予測されたラベル.
+        """
         if self._label is not None:
             return self._label
         else:
             raise exception.InvalidNodeSettingException("葉ノードにラベルが存在しません. ノードを作成する際は必ずNode.set_paramsを実行し, Node.predictを実行する前にラベルをはじめとした各種パラメータを設定してください.")
 
 class MiddleNode(Node):
-    def __init__(self, path, label, gini, sample_n, col_idx, threshold):
+    def __init__(self, path: str, label: any, gini: float, sample_n: int, col_idx: int, threshold: float):
         super().__init__(path, label, gini, sample_n)
         self._col_idx = col_idx
         self._threshold = threshold
@@ -75,14 +89,33 @@ class MiddleNode(Node):
     def is_leaf(self):
         return self._is_leaf
 
-    def predict(self, x):
+    def predict(self, x: np.ndarray):
+        """あるxのラベルを予測する. 再帰関数となっており, 親ノードは分岐後の子ノードのpredict関数を使用する. 
+
+        Args:
+            x (np.ndarray): 特徴量. 1次元のnumpy配列.
+
+        Returns:
+            any: 予測されたラベル.
+        """
         if x[self._col_idx] < self._threshold:
             prdicted_label = self._left.predict(x)
         else:
             prdicted_label = self._right.predict(x)
+        
         return prdicted_label
 
     def get_tree_dict(self):
+        """
+        キーがpath(str), 値がNode(Node)の辞書を作成する.
+
+        このノード以下の, {path: Nodeインスタンス ... } という辞書を作成する再帰関数.
+        ルートでget_tree_dictを呼ぶと, 木全体の辞書を得ることができる.
+
+        Returns:
+            dict: パス(str)がキー, ノードインスタンス(Node)がvalueの辞書.
+        """
+
         dleft = self._left.get_tree_dict()
         dright = self._right.get_tree_dict()
         dself = {self.path: self}
@@ -97,18 +130,38 @@ class DecisionTreeClassifer(Model):
         self.RIGHT = "r"
         self.DELIMITER = "/"
 
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray, max_depth=5, bin_num=256, ccp_alpha=None):
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, max_depth: int =5, bin_num: int =256, ccp_alpha: float=None):
+        """決定木を訓練する.
 
+        Args:
+            X_train (np.ndarray): 説明変数. すべての要素はint, floatなど大小比較ができるものを想定している.
+            y_train (np.ndarray): 正解ラベル. len(X) == len(y)を満たす.
+            max_depth (int, optional): 木の最大深さ. Defaults to 5.
+            bin_num (int, optional): 閾値を決定する際に, 特徴を分けるビンの数. Defaults to 256.
+            ccp_alpha (float, optional): 枝刈りのための閾値. 大きいほど多くの枝刈りが行われる. Defaults to None.
+        """
         self.labels = np.unique(y_train)
         self.d = X_train.shape[1]
 
         root_gini = self._gini(y_train)
         self.root = self._build_tree(self.ROOT_CHAR, X_train, y_train, depth=0, max_depth=max_depth, gini=root_gini, bin_num=bin_num)
+
         if ccp_alpha is not None:
             pruned_node_count = self._prune(ccp_alpha)
             print(f"{pruned_node_count} leaves have pruned.")
 
-    def predict(self, X: np.ndarray):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """_summary_
+
+        Args:
+            X (np.ndarray): X.shape == (データ数, 特徴量の次元)の形のデータ.
+
+        Raises:
+            exception.FunctionUndefinedException: 訓練する前に予測を行うと発生.
+
+        Returns:
+            np.ndarray: 予測されたラベル.
+        """
         result = np.zeros(len(X))
         if self.root is not None:
             for i, x in enumerate(X):
@@ -117,7 +170,17 @@ class DecisionTreeClassifer(Model):
         else:
             raise exception.FunctionUndefinedException("まずDecisionTree.fitを実行してください.")
         
-    def _find_min_gini_threshold(self, X_subset, y_subset, bin_num=256):
+    def _find_min_gini_threshold(self, X_subset: np.ndarray, y_subset: np.ndarray, bin_num=256) -> tuple[int, np.float64, np.float64, np.float64]:
+        """特徴量から, yを最もよく分ける特徴と, その閾値を算出する.
+
+        Args:
+            X_subset (np.ndarray): X_subset.shape == (データ数, 特徴量の次元) の行列. ただし「データ数」はミニバッチのデータ数を意味する.
+            y_subset (np.ndarray): X_subsetに対応する, 正解ラベルの配列. len(X_subset) == len(y_subset) を要求.
+            bin_num (int, optional): 特徴量を分ける際に作成されるヒストグラムのビンの数. 多いほど精度が上がるが, 計算量も大きくなる. Defaults to 256.
+
+        Returns:
+            tuple[int, np.float64, np.float64, np.float64]: 列のインデックス, 閾値, 分割後の左子のジニ不純度, 分割後の右子のジニ不純度
+        """
         max_a = np.max(X_subset, axis=0)
         min_a = np.min(X_subset, axis=0)
         min_gini = np.inf
@@ -153,8 +216,27 @@ class DecisionTreeClassifer(Model):
         min_gini_threshold = min_gini_threshold * (max_a[min_gini_col_idx] - min_a[min_gini_col_idx] + 1e-5) + min_a[min_gini_col_idx]
         return min_gini_col_idx, min_gini_threshold, splited_left_gini, splited_right_gini
     
-    def _build_tree(self, path, X_subset, y_subset, depth, max_depth, gini, bin_num=256, ):
-        
+    def _build_tree(self, path: str, X_subset: np.ndarray, y_subset: np.ndarray, depth: int, max_depth: int, gini: np.float64, bin_num: int =256, ) -> Node:
+        """Nodeオブジェクトを作成する. 再帰関数.
+
+        新たに作成されるNodeオブジェクトは, その子ノードを引っ提げて親ノードに返される.
+        子ノードはこの関数の再帰呼び出しにより作成されて, それを新たに作成したノードの子ノードとして設定する.
+
+        Args:
+            path (str): ルートから, 次に分割する(=子ノードを作る)ノードまでのパス.
+            X_subset (np.ndarray): 分割対象のノードに割り当てられた特徴量.
+            y_subset (np.ndarray): 分割対象のノードに割り当てられた特徴量に対応する正解ラベル.
+            depth (int): 分割対象のノードの, ルートからの距離.
+            max_depth (int): 決定木の最大深さ.
+            gini (np.float64): y_subsetのジニ不純度.
+            bin_num (int, optional): 特徴量を分ける際に作成されるヒストグラムのビンの数. 多いほど精度が上がるが, 計算量も大きくなる. Defaults to 256.
+
+        Raises:
+            exception.NonDataException: X_subsetやy_subsetが空集合であるときに発生.
+
+        Returns:
+            Node: pathの位置に相当するノードオブジェクト.
+        """
         if len(y_subset) == 0 or len(X_subset) == 0:
             raise exception.NonDataException()
 
@@ -181,18 +263,41 @@ class DecisionTreeClassifer(Model):
 
         return node
     
-    def _gini(self, y_subset: np.ndarray):
+    def _gini(self, y_subset: np.ndarray) -> np.float64:
+        """正解ラベルの集合からジニ不純度を計算する.
+
+        Args:
+            y_subset (np.ndarray): 正解ラベル(の部分集合)
+
+        Returns:
+            np.float64: ジニ不純度
+        """
         n = len(y_subset)
         p_sum_square = 0
         for label in self.labels:
-            p_sum_square += (sum(y_subset == label) / n)**2
+            p_sum_square += (np.sum(y_subset == label) / n)**2
         gini = 1 - p_sum_square
         return gini
 
     def _prune(self, ccp_alpha: float):
+        """枝刈りを行う.
+
+        Args:
+            ccp_alpha (float): 枝刈りの程度を決定する. 大きいほど多くの枝が刈られる.
+
+        Raises:
+            exception.InvalidNodeSettingException: 
+            self.DELIMITER, self.LEFT, self.RIGHT, self.ROOT_CHAR以外のパスに出会った場合に発生する.
+
+        Returns:
+            int: 刈られたノードの数.
+        """
         pruned_leaf_n = 0
+
         while True:
+            # キーがpath, 値がNodオブジェクトの辞書を作成.
             tree_dict = self.root.get_tree_dict()
+            # pathの長さは, ノードの深さを表す. 葉ノード側から順にalphaを計算し, 親ノードに足していく.
             reversed_paths = sorted(tree_dict.keys(), key=lambda x: len(x), reverse=True)
             node_impurity_leaf_n_dict = {}
             min_alpha = np.inf
@@ -248,37 +353,6 @@ class DecisionTreeClassifer(Model):
                 parent.set_right(leaf)
 
             else:
-                raise exception.InvalidNodeSettingException(f"Nodeのパスが正しくありません. パスは'.', 'l', 'r', '/'からのみ構成されます. path: {min_alpha_path}")
+                raise exception.InvalidNodeSettingException(f"Nodeのパスが正しくありません. パスは'{self.ROOT_CHAR}', '{self.LEFT}', '{self.RIGHT}', '{self.DELIMITER}'からのみ構成されます. path: {min_alpha_path}")
 
         return pruned_leaf_n
-            
-        
-
-
-if __name__ == "__main__":
-
-    # 分類
-    rng = np.random.default_rng(0)
-    model = DecisionTreeClassifer(unit_nums=[2, 16, 16, 2], task="c")
-
-    # 訓練データ作成(2値分類)
-    data_n = 1000 # データの数
-    r = 3 # 原点からの距離が3未満と3以上の点でクラスを分ける
-    lim = (-5, 5) # データの範囲
-
-    X_train = (lim[1] - lim[0]) * (rng.random((data_n, 2)) - 0.5) # x_1, x_2 \in [-5, 5]
-    mask = np.sum(X_train ** 2, axis=1) < r**2
-    y_train = mask.astype(int) # One-hotベクトル
-
-    
-    model = DecisionTreeClassifer(X_train, y_train)
-
-    model.fit(bin_num=100, max_depth=100, ccp_alpha=1)
-
-    x1 = np.linspace(-5, 5, 100)
-    x2 = np.linspace(-5, 5, 100)
-    xx1, xx2 = np.meshgrid(x1, x2)
-
-    X_test = np.array([x1, x2]).T
-
-    prediction = model.predict(X_test)
