@@ -1,5 +1,4 @@
 from model import Model
-import exception
 
 import numpy as np
 class Node:
@@ -41,11 +40,11 @@ class LeafNode(Node):
         super().__init__(path, label, gini, sample_n)
         self._is_leaf = True
 
-    def set_left(self, left):
-        raise exception.InvalidNodeSettingException("葉ノードに対して子ノードを設定することはできません.")
+    def set_left(self, left: Node):
+        raise ValueError("葉ノードに対して子ノードを設定することはできません.")
     
-    def set_right(self, right):
-        raise exception.InvalidNodeSettingException("葉ノードに対して子ノードを設定することはできません.")
+    def set_right(self, right: Node):
+        raise ValueError("葉ノードに対して子ノードを設定することはできません.")
 
     def is_leaf(self):
         return self._is_leaf
@@ -53,7 +52,7 @@ class LeafNode(Node):
     def get_tree_dict(self):
         return {self.path: self}
     
-    def predict(self, x: np.ndrray) -> any:
+    def predict(self, x: np.ndarray) -> any:
         """特徴ベクトルxのラベルを予測する. 
         
         訓練時に登録されたラベルを返す.
@@ -62,7 +61,7 @@ class LeafNode(Node):
             x (np.ndarray): 特徴量. 1次元のnumpy配列.
 
         Raises:
-            exception.InvalidNodeSettingException: ラベルが設定されていない場合に発火.
+            ValueError: ラベルが設定されていない場合に発火.
 
         Returns:
             any: 予測されたラベル.
@@ -70,7 +69,7 @@ class LeafNode(Node):
         if self._label is not None:
             return self._label
         else:
-            raise exception.InvalidNodeSettingException("葉ノードにラベルが存在しません. ノードを作成する際は必ずNode.set_paramsを実行し, Node.predictを実行する前にラベルをはじめとした各種パラメータを設定してください.")
+            raise ValueError("葉ノードにラベルが存在しません. ノードを作成する際は必ずNode.set_paramsを実行し, Node.predictを実行する前にラベルをはじめとした各種パラメータを設定してください.")
 
 class MiddleNode(Node):
     def __init__(self, path: str, label: any, gini: float, sample_n: int, col_idx: int, threshold: float):
@@ -78,18 +77,18 @@ class MiddleNode(Node):
         self._col_idx = col_idx
         self._threshold = threshold
     
-    def set_left(self, left):
+    def set_left(self, left: Node) -> None:
         self._left = left
         left.set_parent(self)
 
-    def set_right(self, right):
+    def set_right(self, right: Node) -> None:
         self._right = right
         right.set_parent(self)
 
-    def is_leaf(self):
+    def is_leaf(self) -> bool:
         return self._is_leaf
 
-    def predict(self, x: np.ndarray):
+    def predict(self, x: np.ndarray) -> any:
         """あるxのラベルを予測する. 再帰関数となっており, 親ノードは分岐後の子ノードのpredict関数を使用する. 
 
         Args:
@@ -157,7 +156,7 @@ class DecisionTreeClassifer(Model):
             X (np.ndarray): X.shape == (データ数, 特徴量の次元)の形のデータ.
 
         Raises:
-            exception.FunctionUndefinedException: 訓練する前に予測を行うと発生.
+            ValueError: 訓練する前に予測を行うと発生.
 
         Returns:
             np.ndarray: 予測されたラベル.
@@ -168,7 +167,7 @@ class DecisionTreeClassifer(Model):
                 result[i] = self.root.predict(x)
             return result
         else:
-            raise exception.FunctionUndefinedException("まずDecisionTree.fitを実行してください.")
+            raise ValueError("まずDecisionTree.fitを実行してください.")
         
     def _find_min_gini_threshold(self, X_subset: np.ndarray, y_subset: np.ndarray, bin_num=256) -> tuple[int, np.float64, np.float64, np.float64]:
         """特徴量から, yを最もよく分ける特徴と, その閾値を算出する.
@@ -232,13 +231,13 @@ class DecisionTreeClassifer(Model):
             bin_num (int, optional): 特徴量を分ける際に作成されるヒストグラムのビンの数. 多いほど精度が上がるが, 計算量も大きくなる. Defaults to 256.
 
         Raises:
-            exception.NonDataException: X_subsetやy_subsetが空集合であるときに発生.
+            ValueError: X_subsetやy_subsetが空集合であるときに発生.
 
         Returns:
             Node: pathの位置に相当するノードオブジェクト.
         """
         if len(y_subset) == 0 or len(X_subset) == 0:
-            raise exception.NonDataException()
+            raise ValueError(f"与えられたミニバッチの特徴量Xと対応する正解ラベルyのデータ数がそろっていません.\n len(X_subset): {len(X_subset)}, len(y_subset): {len(y_subset)}")
 
         y_unique, counts = np.unique(y_subset, return_counts=True)
         label = y_unique[np.argmax(counts)]
@@ -286,7 +285,7 @@ class DecisionTreeClassifer(Model):
             ccp_alpha (float): 枝刈りの程度を決定する. 大きいほど多くの枝が刈られる.
 
         Raises:
-            exception.InvalidNodeSettingException: 
+            ValueError: 
             self.DELIMITER, self.LEFT, self.RIGHT, self.ROOT_CHAR以外のパスに出会った場合に発生する.
 
         Returns:
@@ -353,6 +352,6 @@ class DecisionTreeClassifer(Model):
                 parent.set_right(leaf)
 
             else:
-                raise exception.InvalidNodeSettingException(f"Nodeのパスが正しくありません. パスは'{self.ROOT_CHAR}', '{self.LEFT}', '{self.RIGHT}', '{self.DELIMITER}'からのみ構成されます. path: {min_alpha_path}")
+                raise ValueError(f"Nodeのパスが正しくありません. パスは'{self.ROOT_CHAR}', '{self.LEFT}', '{self.RIGHT}', '{self.DELIMITER}'からのみ構成されます. path: {min_alpha_path}")
 
         return pruned_leaf_n
