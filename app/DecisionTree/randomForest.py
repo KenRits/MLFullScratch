@@ -1,6 +1,5 @@
 from DecisionTree.decisionTree import DecisionTreeClassifer
 from concurrent.futures import ProcessPoolExecutor
-import exception
 from model import Model
 
 from matplotlib import pyplot as plt
@@ -13,7 +12,7 @@ class RandomForestClassifer(Model):
         super().__init__()
         self.models = {}
 
-    def _train_tree(self, model_idx, X_sample, y_sample, max_depth, bin_num, ccp_alpha, columns):
+    def _train_tree(self, model_idx: int, X_sample, y_sample, max_depth, bin_num, ccp_alpha, columns):
         model = DecisionTreeClassifer()
         model.idx = model_idx
         model.fit(X_sample, y_sample, max_depth=max_depth, bin_num=bin_num, ccp_alpha=ccp_alpha)
@@ -30,10 +29,10 @@ class RandomForestClassifer(Model):
             sample_n = min(data_n, 64)
 
         if feature_n > feature_dim:
-            raise exception.InvalidDataShapeException(f"X_train.shape[1]: {X_train.shape[1]}, feature_n: {feature_n}")
+            raise ValueError(f"X_train.shape[1]: {X_train.shape[1]}, feature_n: {feature_n}")
         
         if not bootstrap and sample_n > data_n:
-            raise exception.InvalidDataShapeException(f"X_train.shape[0]: {X_train.shape[0]}, sample_n: {sample_n}\nbootstrapを行わない場合, データ数以上のサンプルで決定木を構成することはできません. sample_nをデータ数以下にするか, bootstrapをTrueにしてください.")
+            raise ValueError(f"X_train.shape[0]: {X_train.shape[0]}, sample_n: {sample_n}\nbootstrapを行わない場合, データ数以上のサンプルで決定木を構成することはできません. sample_nをデータ数以下にするか, bootstrapをTrueにしてください.")
 
         with ProcessPoolExecutor() as executer:
 
