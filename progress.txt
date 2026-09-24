@@ -43,3 +43,8 @@
 DecisionTreeの高速化のため, c++でジニ不純度を算出する関数calc_giniを実装した. 
 また, ノードを分割する基準を選択する処理全体をC++に書き換えるため, find_min_gini_thresholdのソートするところまでをC++で実装した.
 
+9/23
+find_gini_thresholdの大部分をC++で実装. ただしバグあり. 
+
+9/24
+find_gini_thresholdをC++で実装完了. 次はPythonから呼べるように調整する必要がある.
