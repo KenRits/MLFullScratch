@@ -4,6 +4,8 @@
 #include <cassert>
 #include <numeric>
 #include <algorithm>
+#include <expected>
+#include <unordered_set>
 
 void hello() {
     std::cout << "This is a test." << std::endl;
@@ -28,43 +30,54 @@ struct Split {
     }
 };
 
-float calc_gini(std::vector<int> &y_subset, std::vector<int> &labels) {
+float calc_gini(const std::vector<int> &y_subset, const std::unordered_set<int> &labels) {
+
     assert(y_subset.size() >= 1);
     assert(labels.size() >= 1);
     // label_counts ... labelsと同じサイズのvector. labelsと同じ位置に, そのlabelの個数が入る.
     // つまり, y_subsetに出てくるlabels[i]の個数が, label_counts[i]に入る.
     std::vector<int> label_counts(labels.size(), 0);
 
-    for (int i=0; i<y_subset.size(); i++) {
-        for (int label_idx=0; label_idx<labels.size(); label_idx++) {
-            if (labels.at(label_idx) == y_subset.at(i)) {
-                label_counts.at(label_idx) = label_counts.at(label_idx) + 1;
+    for (const int label : y_subset) {
+        for (int label_idx=0; label_idx<labels.size(); ++label_idx) {
+            if (labels.contains(label)) {
+                ++label_counts.at(label_idx);
                 break;
             } else if (label_idx == labels.size() - 1) {
-                throw "labelsに登録されていない値がy_subsetに入っています: " + std::to_string(labels.at(label_idx));
+                throw std::invalid_argument("labelsに登録されていない値がy_subsetに入っています: " + std::to_string(label));
             }
         }
     }
 
     // label_countsからginiを計算
     float p_sq_sum = 0;
-    for (int i=0; i<label_counts.size(); i++) {
-        float p = static_cast<float>(label_counts.at(i)) / y_subset.size();
+    for (int label_count : label_counts) {
+        float p = static_cast<float>(label_count) / y_subset.size();
         float p_sq = p * p;
         p_sq_sum = p_sq_sum + p_sq;
     }
+    float gini = 1 - p_sq_sum;
 
-    return 1 - p_sq_sum;
+    assert(gini >= 0 && gini < 1);
+
+    return gini;
 }
 
-Split find_min_gini_threshold (std::vector<std::vector<float>> &X_subset_T, std::vector<int> &y_subset, std::vector<int> &labels, int bin_num) {
+std::optional<Split> find_min_gini_threshold (const std::vector<std::vector<float>>& X_subset_T, const std::vector<int> &y_subset, const int bin_num) {
+
     int col_n = X_subset_T.size();
     int data_n = X_subset_T.at(0).size();
 
-    int min_gini_col_idx = 0;
-    float min_gini_threshold = 0;
-    float split_left_gini = 0;
-    float split_right_gini = 0;
+    if (data_n != y_subset.size()) {
+        throw std::invalid_argument("配列のサイズがX_subset_Tとy_subsetで一致しません.");
+    }
+
+    const std::unordered_set<int> labels(y_subset.begin(), y_subset.end());
+
+    int min_gini_col_idx = 0; // 選ばれたカラムのインデックス. 
+    float min_gini_threshold = 0; // 選ばれたカラムにおける, ジニ不純度を最小化する閾値
+    float split_left_gini = 0; // 分割後の, 左子のジニ不純度
+    float split_right_gini = 0; // 分割後の, 右子のジニ不純度
 
     // 返り値の用意
     Split split;
@@ -72,7 +85,7 @@ Split find_min_gini_threshold (std::vector<std::vector<float>> &X_subset_T, std:
     float min_gini = 2; //giniは[0, 1]の範囲であるから, 2で初期化すれば必ず更新される.
 
     for (int col_idx=0; col_idx<col_n; col_idx++) {
-        std::vector<float>& column = X_subset_T.at(col_idx);
+        const std::vector<float>& column = X_subset_T.at(col_idx);
 
         // columnを基準に, インデックスのリストを昇順にソートする.
         std::vector<int> indices(data_n); 
@@ -86,7 +99,6 @@ Split find_min_gini_threshold (std::vector<std::vector<float>> &X_subset_T, std:
         );
         
         // columnとy_subsetをindicesの通り並べ替える.
-
         std::vector<float> column_sorted(data_n);
         std::vector<int> y_sorted(data_n);
 
@@ -101,18 +113,27 @@ Split find_min_gini_threshold (std::vector<std::vector<float>> &X_subset_T, std:
         float bin_width = (x_max - x_min) / bin_num; // binの幅
 
         // x_minからbin_widthずつ足していくことで閾値を得て, その閾値によりy_sortedを左右に分ける. 
-        int split_idx = 1; // column_sorted[:split_idx]とcolumn_sorted[split_idx:]で二つに分ける.
+        int split_idx = 0; // column_sorted[:split_idx]とcolumn_sorted[split_idx:]で二つに分ける.
         
         // ビンとビンの間を走査していくイメージ(閾値ごとに1loop). 植木算より, ビンとビンの間の数はbin_num - 1 
         for (int i=0; i<bin_num-1; i++) {
             float threshold = x_min + (i+1) * bin_width; // threshold更新
-            
+
             // column_sortedがthresholdを超えるまで大きい側へ添え字を移動.
+            bool split_idx_updated = false;
             while (column_sorted.at(split_idx) < threshold) {
-                split_idx++;
-            } 
-            std::vector<int> y_sorted_left(y_sorted.begin(), y_sorted.begin()+split_idx);
-            std::vector<int> y_sorted_right(y_sorted.begin()+split_idx, y_sorted.end());
+                split_idx_updated = true;
+                ++split_idx;
+            }
+            
+            // threshldを更新したにもかかわらず, split_idxが変わらない場合 = ビンが空である場合は, 
+            // そのビンの処理をスキップする.
+            if (!split_idx_updated) {
+                continue;
+            }
+
+            const std::vector<int> y_sorted_left(y_sorted.begin(), y_sorted.begin()+split_idx);
+            const std::vector<int> y_sorted_right(y_sorted.begin()+split_idx, y_sorted.end());
             
             // gini不純度の計算
             float left_gini = calc_gini(y_sorted_left, labels);
@@ -128,34 +149,40 @@ Split find_min_gini_threshold (std::vector<std::vector<float>> &X_subset_T, std:
             // giniが暫定の最小値より小さい場合, 更新
             if (gini < min_gini) {
                 min_gini = gini;
-                min_gini_threshold = (column_sorted.at(split_idx) + column_sorted.at(split_idx+1)) / 2;
+                min_gini_threshold = (column_sorted.at(split_idx-1) + column_sorted.at(split_idx)) / 2;
 
                 split.update(col_idx, min_gini_threshold, left_gini, right_gini);
             }
         }
     }
-    assert(split.updated);
-    return split;
+    
+    if (split.updated) { // 分割するべき場所があった場合. 
+        return split;
+    } else { // 分割すべき場所がなかった場合. すべてのX_subset_Tの値が同じであるときに発生.
+        return std::nullopt;
+    }
+    
 }
 
 int main() {
     std::vector<std::vector<float>> X_T = 
     {
-        {1, 2, 3},
-        {3, 0, -8}
+        {3, 3},
+        {3, 2},
+        {3, 3}
     };
-    std::vector<int> y = {0, 0, 1};
-    std::vector<int> labels = {0, 1};
+    std::vector<int> y = {0, 1, 2, 0, 1, 0};
+    std::vector<int> labels = {0, 1, 2};
     int bin_num = 256;
 
-    try {
-        Split split = find_min_gini_threshold(X_T, y, labels, bin_num);
-        std::cout << split.col_idx << "\n";
-        std::cout << split.threshold << "\n";
-
-        return 0;
-    } catch(char *str) {
-        std::cout << *str;
-        return -1;
+    std::optional<Split> result = find_min_gini_threshold(X_T, y, bin_num);
+    if (result) {
+        Split split = *result;
+        std::cout << "col_idx: " << split.col_idx << "\n";
+        std::cout << "threshold: " << split.threshold << "\n";
+        std::cout << "left_gini: " << split.left_gini << "\n";
+        std::cout << "right_gini: " << split.right_gini << "\n";
+    } else {
+        std::cout << "分割すべき場所が存在しませんでした." << std::endl;
     }
 }
