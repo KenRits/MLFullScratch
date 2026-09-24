@@ -10,14 +10,14 @@ void hello() {
     std::cout << "This is a test." << std::endl;
 }
 
-struct Split {
+class Split {
+    public:
     bool updated;
     int col_idx;
     float threshold;
     float left_gini;
     float right_gini;
 
-    public:
     Split () : updated(false), col_idx(0), threshold(0), left_gini(0), right_gini(0) {}
 
     void update (int _col_idx, float _threshold, float _left_gini, float _right_gini) {
@@ -27,6 +27,25 @@ struct Split {
         left_gini = _left_gini;
         right_gini = _right_gini;
     }
+
+    SplitForC create_obj_for_C() {
+        SplitForC s;
+        s.updated = updated;
+        s.col_idx = col_idx;
+        s.threshold = threshold;
+        s.left_gini = left_gini;
+        s.right_gini = right_gini;
+
+        return s;
+    }
+};
+
+extern "C" struct SplitForC {
+    bool updated;
+    int col_idx;
+    float threshold;
+    float left_gini;
+    float right_gini;
 };
 
 float calc_gini(const std::vector<int> &y_subset, const std::unordered_set<int> &labels) {
@@ -160,6 +179,10 @@ std::optional<Split> find_min_gini_threshold (const std::vector<std::vector<floa
     } else { // 分割すべき場所がなかった場合. すべてのX_subset_Tの値が同じであるときに発生.
         return std::nullopt;
     }
+    
+}
+
+extern "C" __declspec(dllexport) SplitForC find_min_gini_threshold_shared () {
     
 }
 
