@@ -10,6 +10,15 @@ void hello() {
     std::cout << "This is a test." << std::endl;
 }
 
+// Python側に公開する, 返り値用の構造体.
+extern "C" struct SplitForC {
+    bool updated;
+    int col_idx;
+    float threshold;
+    float left_gini;
+    float right_gini;
+};
+
 class Split {
     public:
     bool updated;
@@ -27,7 +36,8 @@ class Split {
         left_gini = _left_gini;
         right_gini = _right_gini;
     }
-
+    
+    // Python側に返すために定義.
     SplitForC create_obj_for_C() {
         SplitForC s;
         s.updated = updated;
@@ -40,13 +50,7 @@ class Split {
     }
 };
 
-extern "C" struct SplitForC {
-    bool updated;
-    int col_idx;
-    float threshold;
-    float left_gini;
-    float right_gini;
-};
+
 
 float calc_gini(const std::vector<int> &y_subset, const std::unordered_set<int> &labels) {
 
@@ -81,7 +85,7 @@ float calc_gini(const std::vector<int> &y_subset, const std::unordered_set<int> 
     return gini;
 }
 
-std::optional<Split> find_min_gini_threshold (const std::vector<std::vector<float>>& X_subset_T, const std::vector<int> &y_subset, const int bin_num) {
+Split find_min_gini_threshold(const std::vector<std::vector<float>>& X_subset_T, const std::vector<int> &y_subset, const int bin_num) {
 
     int col_n = X_subset_T.size();
     int data_n = X_subset_T.at(0).size();
@@ -174,37 +178,67 @@ std::optional<Split> find_min_gini_threshold (const std::vector<std::vector<floa
         }
     }
     
-    if (split.updated) { // 分割するべき場所があった場合. 
-        return split;
-    } else { // 分割すべき場所がなかった場合. すべてのX_subset_Tの値が同じであるときに発生.
-        return std::nullopt;
-    }
+    return split;
     
 }
 
-extern "C" __declspec(dllexport) SplitForC find_min_gini_threshold_shared () {
+extern "C" __declspec(dllexport) SplitForC find_min_gini_threshold_shared(float* X_subset_flatten_ptr, int* y_subset_ptr, int data_n, int col_n, int bin_num) {
+    // X_subset_T, y_subsetを作る. 0で初期化.
+    std::vector<std::vector<float>> X_subset_T; 
+    std::vector<int> y_subset;
+
+    X_subset_T.assign(col_n, std::vector<float>(data_n, 0));
+    y_subset.assign(data_n, 0);
     
+    for (int i = 0; i < data_n; ++i) {
+        y_subset.at(i) = y_subset_ptr[i];
+        for (int j = 0; j < col_n; ++j) {
+            X_subset_T.at(j).at(i) = X_subset_flatten_ptr[i*col_n + j]; // 転値するため, X_subset_T.at(j).at(i)の順でアクセス.
+        }
+    }
+
+    // X_subset_T確認用
+
+    for (int i=0; i < X_subset_T.size(); ++i) {
+        for (int j = 0; j < X_subset_T.at(0).size(); ++j) {
+            std::cout << X_subset_T.at(i).at(j);
+        }
+        std::cout << "\n" << std::endl;
+    }
+
+    Split split = find_min_gini_threshold(X_subset_T, y_subset, bin_num);
+    SplitForC split_for_c = split.create_obj_for_C();
+
+    return split_for_c;
 }
 
 int main() {
+    
     std::vector<std::vector<float>> X_T = 
     {
-        {3, 3},
-        {3, 2},
-        {3, 3}
+        {3, 3, -3, -2},
+        {3, 2, 1, 4},
+        {3, 3, 1, 0}
     };
-    std::vector<int> y = {0, 1, 2, 0, 1, 0};
-    std::vector<int> labels = {0, 1, 2};
-    int bin_num = 256;
+    std::vector<int> y = {1, 1, 1, 0};
 
-    std::optional<Split> result = find_min_gini_threshold(X_T, y, bin_num);
-    if (result) {
-        Split split = *result;
-        std::cout << "col_idx: " << split.col_idx << "\n";
-        std::cout << "threshold: " << split.threshold << "\n";
-        std::cout << "left_gini: " << split.left_gini << "\n";
-        std::cout << "right_gini: " << split.right_gini << "\n";
-    } else {
-        std::cout << "分割すべき場所が存在しませんでした." << std::endl;
-    }
+    std::vector<std::vector<float>> X = 
+    {
+        {3, 3, 3},
+        {3, 2, 3}, 
+        {-3, 1, 1},
+        {-2, 4, 0}
+    };
+
+    float X_C[12] = {3, 3, 3, 3, 2, 3, -3, 1, 1, -2, 4, 0};
+    int y_C[4] = {1, 1, 1, 0};
+    float* X_C_ptr = X_C;
+
+    SplitForC split_for_C = find_min_gini_threshold_shared(X_C_ptr, y_C, 4, 3, 256);
+
+    std::cout << "col_idx: " << split_for_C.col_idx << "\nthreshold: " << split_for_C.threshold << "\nleft_gini: " << split_for_C.left_gini << "\nrigt_gini: " << split_for_C.right_gini << std::endl;
+
+    Split split = find_min_gini_threshold(X_T, y, 256);
+
+    std::cout << "col_idx: " << split.col_idx << "\nthreshold: " << split.threshold << "\nleft_gini: " << split.left_gini << "\nrigt_gini: " << split.right_gini << std::endl;
 }
