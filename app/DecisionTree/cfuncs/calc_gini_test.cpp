@@ -4,7 +4,7 @@
 #include <cassert>
 #include <numeric>
 #include <algorithm>
-#include <unordered_set>
+#include <set>
 
 void hello() {
     std::cout << "This is a test." << std::endl;
@@ -52,7 +52,7 @@ class Split {
 
 
 
-float calc_gini(const std::vector<int> &y_subset, const std::unordered_set<int> &labels) {
+float calc_gini(const std::vector<int> &y_subset, const std::set<int> &labels) {
 
     assert(y_subset.size() >= 1);
     assert(labels.size() >= 1);
@@ -60,13 +60,16 @@ float calc_gini(const std::vector<int> &y_subset, const std::unordered_set<int> 
     // つまり, y_subsetに出てくるlabels[i]の個数が, label_counts[i]に入る.
     std::vector<int> label_counts(labels.size(), 0);
 
-    for (const int label : y_subset) {
-        for (int label_idx=0; label_idx<labels.size(); ++label_idx) {
-            if (labels.contains(label)) {
+    for (int data_label : y_subset) {
+        int label_idx = 0;
+        for (int registered_label : labels) {
+            if (data_label == registered_label) {
                 ++label_counts.at(label_idx);
                 break;
             } else if (label_idx == labels.size() - 1) {
-                throw std::invalid_argument("labelsに登録されていない値がy_subsetに入っています: " + std::to_string(label));
+                throw std::invalid_argument("labelsに登録されていない値がy_subsetに入っています: " + std::to_string(data_label));
+            } else {
+                ++label_idx;
             }
         }
     }
@@ -80,7 +83,7 @@ float calc_gini(const std::vector<int> &y_subset, const std::unordered_set<int> 
     }
     float gini = 1 - p_sq_sum;
 
-    assert(gini >= 0 && gini < 1);
+    assert(gini >= 0 && gini <= 1);
 
     return gini;
 }
@@ -94,7 +97,7 @@ Split find_min_gini_threshold(const std::vector<std::vector<float>>& X_subset_T,
         throw std::invalid_argument("配列のサイズがX_subset_Tとy_subsetで一致しません.");
     }
 
-    const std::unordered_set<int> labels(y_subset.begin(), y_subset.end());
+    const std::set<int> labels(y_subset.begin(), y_subset.end());
 
     int min_gini_col_idx = 0; // 選ばれたカラムのインデックス. 
     float min_gini_threshold = 0; // 選ばれたカラムにおける, ジニ不純度を最小化する閾値
@@ -216,9 +219,8 @@ int main() {
     
     std::vector<std::vector<float>> X_T = 
     {
-        {3, 3, -3, -2},
-        {3, 2, 1, 4},
-        {3, 3, 1, 0}
+        {3, 3, -3, 1},
+        {3, 2, 2, 1},
     };
     std::vector<int> y = {1, 1, 1, 0};
 
@@ -234,11 +236,12 @@ int main() {
     int y_C[4] = {1, 1, 1, 0};
     float* X_C_ptr = X_C;
 
-    SplitForC split_for_C = find_min_gini_threshold_shared(X_C_ptr, y_C, 4, 3, 256);
+    // SplitForC split_for_C = find_min_gini_threshold_shared(X_C_ptr, y_C, 4, 3, 256);
 
-    std::cout << "col_idx: " << split_for_C.col_idx << "\nthreshold: " << split_for_C.threshold << "\nleft_gini: " << split_for_C.left_gini << "\nrigt_gini: " << split_for_C.right_gini << std::endl;
+    // std::cout << "col_idx: " << split_for_C.col_idx << "\nthreshold: " << split_for_C.threshold << "\nleft_gini: " << split_for_C.left_gini << "\nrigt_gini: " << split_for_C.right_gini << std::endl;
 
-    Split split = find_min_gini_threshold(X_T, y, 256);
+    Split split = find_min_gini_threshold(X_T, y, 10);
+
 
     std::cout << "col_idx: " << split.col_idx << "\nthreshold: " << split.threshold << "\nleft_gini: " << split.left_gini << "\nrigt_gini: " << split.right_gini << std::endl;
 }
